@@ -1,43 +1,110 @@
-# LexicalPrivate
+# lexical_private
 
-TODO: Delete this and the text below, and describe your gem
+`lexical_private` is a Ruby gem that provides stronger visibility control for module methods than Ruby's built-in `private`.
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/lexical_private`. To experiment with that code, run `bin/console` for an interactive prompt.
+## Motivation
 
-## Installation
+Ruby's `private` controls visibility at the object level: a private method can be called from any method on the same object, including methods defined in an including class. This is intentional and useful in many cases.
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
+`lexical_private` offers a stricter alternative for situations where you want a method to be an internal detail of a specific module — inaccessible even to the classes that include it.
 
-Install the gem and add to the application's Gemfile by executing:
-
-```bash
-bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
-```
-
-If bundler is not being used to manage dependencies, install the gem by executing:
-
-```bash
-gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
-```
+| Caller | `private` | `lexical_private` |
+|---|---|---|
+| Method in the same module | allowed | allowed |
+| Method added by an including class | allowed | NoMethodError |
+| Direct external call (`obj.method`) | NoMethodError | NoMethodError |
 
 ## Usage
 
-TODO: Write usage instructions here
+1. `extend LexicalPrivate` in your module.
+2. Define public methods first (they can call lexically-private methods internally).
+3. Call `lexical_private` — all methods defined after this point become lexically private.
+
+```ruby
+require "lexical_private"
+
+module M
+  extend LexicalPrivate
+
+  def public_method
+    secret  # OK — defined in the same module
+  end
+
+  lexical_private
+
+    def secret
+      "shh"
+    end
+end
+
+class C
+  include M
+
+  def leak
+    secret  # raises NoMethodError
+  end
+end
+
+C.new.public_method  # => "shh"
+C.new.secret         # => NoMethodError: private method 'secret' called for an instance of C
+C.new.leak           # => NoMethodError: private method 'secret' called for an instance of C
+```
+
+Lexically-private methods can freely call other lexically-private methods defined in the same module:
+
+```ruby
+module M
+  extend LexicalPrivate
+
+  def entry
+    step_one
+  end
+
+  lexical_private
+
+    def step_one
+      step_two  # OK — step_two is also in M
+    end
+
+    def step_two
+      "done"
+    end
+end
+```
+
+## How it works
+
+When `lexical_private` is called, the gem:
+
+1. Wraps all already-defined methods in the module to track that execution is happening "inside" the module (via a thread-local counter keyed to the module's identity).
+2. Installs a `method_added` hook so that every subsequent method definition is wrapped to check that counter before running. If the counter is zero (the call came from outside the module), `NoMethodError` is raised.
+
+Each module gets its own counter key derived from its `object_id`, so multiple modules with lexically-private methods never interfere with each other.
+
+## Installation
+
+Add to your `Gemfile`:
+
+```ruby
+gem "lexical_private"
+```
+
+Or install directly:
+
+```bash
+gem install lexical_private
+```
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
-
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
-
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/lexical_private. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/lexical_private/blob/master/CODE_OF_CONDUCT.md).
+```bash
+bin/setup                  # install dependencies
+bundle exec rake spec      # run tests
+bundle exec rake rubocop   # run linter
+bundle exec rake           # run both (default)
+bin/console                # interactive prompt
+```
 
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
-## Code of Conduct
-
-Everyone interacting in the LexicalPrivate project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/[USERNAME]/lexical_private/blob/master/CODE_OF_CONDUCT.md).

@@ -6,10 +6,9 @@ Gem::Specification.new do |spec|
   spec.name = "lexical_private"
   spec.version = LexicalPrivate::VERSION
   spec.authors = ["kyuuri1791"]
-  spec.email = ["okaoka1791@gmail.com"]
 
-  spec.summary = "TODO: Write a short summary, because RubyGems requires one."
-  spec.description = "TODO: Write a longer description or delete this line."
+  spec.summary = "Stricter visibility control for module methods than Ruby's built-in private"
+  spec.description = "Provides lexical_private, which restricts module methods so they can only be called from within the same module definition — unlike Ruby's private, which still allows including classes to call them." # rubocop:disable Layout/LineLength
   spec.homepage = "TODO: Put your gem's website or public repo URL here."
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
